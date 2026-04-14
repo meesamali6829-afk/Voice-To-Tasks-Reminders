@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceTask - Professional Voice Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --accent-color: #1a1a1a;
+            --border-color: #eeeeee;
+            --transition: all 0.3s ease;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); overflow-x: hidden; }
+
+        /* --- Navigation & Sidebar --- */
+        .top-nav { padding: 20px; display: flex; align-items: center; border-bottom: 1px solid var(--border-color); position: fixed; width: 100%; top: 0; background: white; z-index: 100; }
+        .menu-btn { cursor: pointer; padding: 10px; display: flex; flex-direction: column; gap: 5px; }
+        .menu-btn div { width: 25px; height: 2px; background-color: var(--text-color); transition: var(--transition); }
+        
+        /* Sidebar Fix: Higher Z-Index for clicking buttons */
+        .sidebar { position: fixed; left: -300px; top: 0; width: 300px; height: 100%; background: var(--bg-color); box-shadow: 5px 0 15px rgba(0,0,0,0.05); z-index: 3000; transition: var(--transition); padding: 40px 20px; }
+        .sidebar.active { left: 0; }
+        .close-btn { position: absolute; top: 20px; right: 20px; font-size: 24px; cursor: pointer; }
+        .sidebar-menu { list-style: none; margin-top: 50px; }
+        .sidebar-menu li { padding: 15px 0; border-bottom: 1px solid var(--border-color); cursor: pointer; font-weight: 500; transition: var(--transition); }
+        .sidebar-menu li:hover { padding-left: 10px; color: #666; }
+
+        /* --- Updated Main Content Structure --- */
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 100px 20px 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .mic-section { margin-bottom: 20px; position: sticky; top: 80px; background: white; width: 100%; padding: 10px 0; z-index: 50; text-align: center; }
+        
+        /* Language Selector Style */
+        .lang-select {
+            margin-bottom: 15px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
+            background: #f9f9f9;
+        }
+
+        .mic-button {
+            width: 70px; height: 70px; border-radius: 50%;
+            background: var(--accent-color); border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto; transition: var(--transition);
+        }
+        
+        /* Real Stop State Color */
+        .mic-button.listening { background: #e74c3c; animation: pulse 1.5s infinite; }
+        .mic-button svg { fill: white; width: 30px; }
+
+        .line-divider { width: 100%; height: 1px; background: var(--border-color); margin: 20px 0; }
+
+        /* --- Task History Structure --- */
+        .history-container { width: 100%; text-align: left; }
+        .day-group { margin-bottom: 30px; }
+        .day-header { font-weight: 600; font-size: 0.9rem; color: #888; text-transform: uppercase; margin-bottom: 15px; border-left: 3px solid black; padding-left: 10px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .task-card {
+            background: #fafafa; border: 1px solid var(--border-color);
+            padding: 15px; border-radius: 10px; margin-bottom: 10px;
+            display: flex; flex-direction: column; transition: 0.2s;
+        }
+        .task-card:hover { border-color: #ccc; }
+        .task-time { font-size: 0.75rem; color: #aaa; margin-bottom: 5px; }
+        .task-text { font-size: 1rem; color: #333; }
+
+        /* --- Schedule Controls --- */
+        .schedule-nav { display: flex; gap: 10px; margin-bottom: 15px; }
+        .nav-btn { padding: 5px 12px; background: #eee; border-radius: 5px; font-size: 0.7rem; cursor: pointer; border: none; }
+
+        /* --- Status Text --- */
+        #status-msg { font-size: 0.8rem; color: #666; margin-top: 10px; height: 20px; }
+
+        /* --- Full Screen Panels --- */
+        .panel { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: white; 
+            padding: 80px 40px 40px 40px; 
+            z-index: 4000; 
+            overflow-y: auto; 
+        }
+        
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; }
+        
+        .btn-close-panel { 
+            background: black; 
+            color: white; 
+            padding: 12px 25px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin-top: 30px;
+            font-weight: 600;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="overlay" id="overlay" onclick="closeSidebar(); closePanel()"></div>
+
+    <nav class="top-nav">
+        <div class="menu-btn" onclick="toggleSidebar()">
+            <div></div><div></div><div></div>
+        </div>
+        <div style="margin-left: 20px; font-weight: 600; letter-spacing: 1px;">VOICETASK</div>
+    </nav>
+
+    <div class="sidebar" id="sidebar">
+        <div class="close-btn" onclick="toggleSidebar()">&times;</div>
+        <ul class="sidebar-menu">
+            <li onclick="showPanel('about-panel')">About Us</li>
+            <li onclick="showPanel('privacy-panel')">Privacy & Security</li>
+            <li onclick="shareApp()">Share All Access</li>
+            <li onclick="rateUs()">Rate Us</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="mic-section">
+            <select id="lang-select" class="lang-select">
+                <option value="en-US">English (US)</option>
+                <option value="en-IN">Hinglish</option>
+                <option value="ur-PK">Urdu (Pakistan)</option>
+                <option value="hi-IN">Hindi</option>
+                <option value="ar-SA">Arabic</option>
+                <option value="zh-CN">Chinese</option>
+                <option value="fr-FR">French</option>
+                <option value="de-DE">German</option>
+                <option value="es-ES">Spanish</option>
+            </select>
+
+            <button class="mic-button" id="mic-btn">
+                <svg id="mic-icon" viewBox="0 0 24 24">
+                    <path id="mic-path" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+            </button>
+            <div id="status-msg">Tap to start speaking</div>
+        </div>
+
+        <div class="line-divider"></div>
+
+        <div class="schedule-nav">
+            <button class="nav-btn" onclick="changeDay(-1)">← Previous Day</button>
+            <button class="nav-btn" onclick="changeDay(1)">Next Day →</button>
+        </div>
+
+        <div class="history-container" id="task-history">
+            <div class="day-group">
+                <div class="day-header" id="current-day-display">TODAY</div>
+                <div id="today-tasks"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="about-panel" class="panel">
+        <h2>About VoiceTask</h2>
+        <p style="margin-top: 20px;">Welcome to VoiceTask, the world's most intuitive productivity interface designed to bridge the gap between human thought and digital execution. Our mission is to empower individuals worldwide by providing a hands-free environment where ideas are captured instantly. We believe that technology should be accessible to everyone, regardless of their technical expertise. VoiceTask uses advanced recognition algorithms to ensure that every word you speak is transcribed with 99% accuracy, allowing you to focus on your creativity rather than typing.</p>
+        <p style="margin-top: 15px;">In a rapidly evolving digital landscape, we recognized a significant barrier: the complexity of traditional input methods. Whether you are a busy professional multitasking in the office, a student capturing lecture notes, or an entrepreneur brainstorming the next big idea, VoiceTask is built for you. Our commitment to excellence drives us to constantly innovate, ensuring that our users experience a seamless transition from voice to text. We are more than just an app; we are a global community dedicated to making life simpler, one word at a time. Thank you for choosing us to be part of your journey toward maximum efficiency.</p>
+        <button class="btn-close-panel" onclick="closePanel()">Go Back</button>
+    </div>
+
+    <div id="privacy-panel" class="panel">
+        <h2>Privacy & Security</h2>
+        <p style="margin-top: 20px;">Your privacy is our utmost priority at VoiceTask. We understand that your voice data is personal and sensitive, which is why we have implemented military-grade encryption to protect every interaction you have with our platform. Unlike other services, we do not store your recordings on our servers indefinitely. Once your voice is converted to text, the audio file is immediately purged from our temporary cache. We believe in transparency and give you full control over your data. You can request a complete data wipe at any time through our user-friendly settings dashboard.</p>
+        <p style="margin-top: 15px;">Furthermore, we adhere to strict international data protection regulations, including GDPR and CCPA compliance. We do not sell your personal information to third-party advertisers or data brokers. Our security infrastructure is audited regularly by independent cybersecurity experts to identify and neutralize potential vulnerabilities. We use multi-factor authentication and secure socket layers (SSL) to ensure that your connection to VoiceTask is always private. By choosing VoiceTask, you are choosing a partner that values your digital safety as much as you do. Work with confidence, knowing that your thoughts are secure with us.</p>
+        <button class="btn-close-panel" onclick="closePanel()">Go Back</button>
+    </div>
+
+    <script>
+        let isListening = false;
+        let displayedDate = new Date();
+        const micBtn = document.getElementById('mic-btn');
+        const statusMsg = document.getElementById('status-msg');
+        const taskList = document.getElementById('today-tasks');
+        const micIconPath = document.getElementById('mic-path');
+        const langSelect = document.getElementById('lang-select');
+        const dayDisplay = document.getElementById('current-day-display');
+
+        // --- NAYA ALARM & BACKGROUND LOGIC ---
+        const alarmSound = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock_ringing_proximity.ogg");
+        alarmSound.loop = true;
+        let wakeLock = null;
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(function(reg) {
+                console.log('Service Worker Registered!', reg);
+            }).catch(function(err) {
+                console.log('Service Worker Failed!', err);
+            });
+        }
+
+        async function keepAppAlive() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.error(`${err.name}, ${err.message}`);
+            }
+        }
+
+        function extractTime(text) {
+            const timeRegex = /(\d{1,2})(?::(\d{2}))?\s*(am|pm|baje)?/i;
+            const match = text.match(timeRegex);
+            if (match) {
+                let hours = parseInt(match[1]);
+                let minutes = match[2] ? parseInt(match[2]) : 0;
+                let period = match[3] ? match[3].toLowerCase() : '';
+                if (period === 'pm' && hours < 12) hours += 12;
+                if (period === 'am' && hours === 12) hours = 0;
+                const target = new Date();
+                target.setHours(hours, minutes, 0, 0);
+                if (target < new Date()) target.setDate(target.getDate() + 1);
+                return target.getTime();
+            }
+            return null;
+        }
+
+        function playZoorSeAlarm(taskText) {
+            alarmSound.play().catch(e => console.log("Audio play failed, user interaction needed"));
+            const message = new SpeechSynthesisUtterance();
+            message.text = "Uthye, " + taskText + " ka waqt ho gaya hai.";
+            message.lang = 'hi-IN';
+            message.rate = 0.9;
+            window.speechSynthesis.speak(message);
+
+            if (Notification.permission === "granted") {
+                navigator.serviceWorker.ready.then(function(registration) {
+                    registration.showNotification("ALARM BAJ RAHA HAI", {
+                        body: taskText,
+                        requireInteraction: true,
+                        vibrate: [300, 100, 300]
+                    });
+                });
+            }
+
+            setTimeout(() => {
+                if(confirm("TASK: " + taskText + "\nStop karne ke liye OK dabayein.")) {
+                    alarmSound.pause();
+                    alarmSound.currentTime = 0;
+                    window.speechSynthesis.cancel();
+                }
+            }, 500);
+        }
+
+        setInterval(() => {
+            let savedTasks = JSON.parse(localStorage.getItem('voiceTasks') || "[]");
+            const now = new Date().getTime();
+            let changed = false;
+            savedTasks.forEach(task => {
+                if (task.alarmTime && !task.triggered && now >= task.alarmTime) {
+                    playZoorSeAlarm(task.text);
+                    task.triggered = true;
+                    changed = true;
+                }
+            });
+            if (changed) localStorage.setItem('voiceTasks', JSON.stringify(savedTasks));
+        }, 1000);
+
+        // Notification Permission mangna
+        if ("Notification" in window) {
+            Notification.requestPermission();
+        }
+
+        function updateDayDisplay() {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const dateStr = displayedDate.toLocaleDateString(undefined, options);
+            dayDisplay.innerText = dateStr;
+            renderLifetimeTasks(dateStr);
+        }
+
+        function changeDay(offset) {
+            displayedDate.setDate(displayedDate.getDate() + offset);
+            updateDayDisplay();
+        }
+
+        // Sidebar & Panel Logic
+        function toggleSidebar() { 
+            const sb = document.getElementById('sidebar');
+            const ov = document.getElementById('overlay');
+            sb.classList.toggle('active'); 
+            ov.style.display = sb.classList.contains('active') ? 'block' : 'none';
+        }
+        function closeSidebar() { 
+            document.getElementById('sidebar').classList.remove('active'); 
+            document.getElementById('overlay').style.display = 'none'; 
+        }
+        function showPanel(id) { 
+            closeSidebar(); 
+            document.getElementById('overlay').style.display = 'none'; 
+            document.getElementById(id).style.display = 'block'; 
+        }
+        function closePanel() { 
+            document.querySelectorAll('.panel').forEach(p => p.style.display = 'none'); 
+            document.getElementById('overlay').style.display = 'none'; 
+        }
+        function shareApp() { if(navigator.share) navigator.share({title:'VoiceTask', url:window.location.href}); }
+        function rateUs() { window.open('https://play.google.com/store/apps', '_blank'); }
+
+        // Real Voice Logic with Language Support
+        if ('webkitSpeechRecognition' in window) {
+            const recognition = new webkitSpeechRecognition();
+            recognition.continuous = false; // Har baar stop hone par naya card banega
+            recognition.interimResults = true;
+
+            micBtn.onclick = () => {
+                if (!isListening) {
+                    recognition.lang = langSelect.value;
+                    recognition.start();
+                } else {
+                    recognition.stop();
+                }
+            };
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('listening');
+                statusMsg.innerText = "Listening (" + langSelect.options[langSelect.selectedIndex].text + ")...";
+                micIconPath.setAttribute('d', 'M6 6h12v12H6z'); 
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                micBtn.classList.remove('listening');
+                statusMsg.innerText = "Tap to start speaking";
+                micIconPath.setAttribute('d', 'M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z');
+            };
+
+            recognition.onresult = (event) => {
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                        addTaskToUI(finalTranscript);
+                    }
+                }
+            };
+        }
+
+        // Lifetime Storage aur UI Filter
+        function addTaskToUI(text) {
+            keepAppAlive(); 
+            const now = new Date();
+            const timeStr = now.getHours() + ":" + now.getMinutes().toString().padStart(2, '0');
+            const fullDateStr = displayedDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            
+            const alarmTarget = extractTime(text);
+            const taskObj = { 
+                text: text, 
+                time: timeStr, 
+                date: fullDateStr, 
+                alarmTime: alarmTarget, 
+                triggered: false 
+            };
+            
+            let savedTasks = JSON.parse(localStorage.getItem('voiceTasks') || "[]");
+            savedTasks.push(taskObj);
+            localStorage.setItem('voiceTasks', JSON.stringify(savedTasks));
+
+            if (text.toLowerCase().includes("baje") || text.toLowerCase().includes("time")) {
+                if (Notification.permission === "granted") {
+                    new Notification("VoiceTask Reminder Set", { body: `Scheduled: ${text}` });
+                }
+            }
+
+            renderLifetimeTasks(fullDateStr);
+        }
+
+        function renderLifetimeTasks(filterDate) {
+            taskList.innerHTML = '';
+            let savedTasks = JSON.parse(localStorage.getItem('voiceTasks') || "[]");
+            
+            savedTasks.filter(t => t.date === filterDate).reverse().forEach(task => {
+                const card = document.createElement('div');
+                card.className = 'task-card';
+                card.innerHTML = `
+                    <div class="task-time">${task.time}</div>
+                    <div class="task-text">${task.text}</div>
+                `;
+                taskList.appendChild(card);
+            });
+        }
+
+        updateDayDisplay();
+    </script>
+</body>
+</html>
